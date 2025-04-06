@@ -2,4 +2,4 @@
 **/testproject
 **/*.egg-info
 **/__pycache__
-**/django-micro-auth.png
+**/.vscode
