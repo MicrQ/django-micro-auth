@@ -4,6 +4,7 @@
 """
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -64,4 +65,12 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         UserModel = get_user_model()
 
-        return UserModel.objects.create_user(**validated_data)
+        try:
+            return UserModel.objects.create_user(**validated_data)
+
+        except IntegrityError as e:
+            username_field = getattr(UserModel, 'USERNAME_FIELD', 'username')
+
+            raise serializers.ValidationError({
+                username_field: f'This {username_field} is already taken.'
+            }) from e
