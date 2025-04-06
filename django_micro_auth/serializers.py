@@ -49,7 +49,10 @@ class RegisterSerializer(serializers.ModelSerializer):
         # Ensure username field is available and required
         username_field = getattr(self.Meta.model, 'USERNAME_FIELD', 'username')
         if username_field in available_fields:
-            self.fields[username_field] = serializers.CharField(required=True)
+            if username_field == 'email':
+                self.fields[username_field] = serializers.EmailField(required=True)
+            else:
+                self.fields[username_field] = serializers.CharField(required=True)
 
     def create(self, validated_data):
         """
