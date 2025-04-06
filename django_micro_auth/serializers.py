@@ -18,9 +18,11 @@ class RegisterSerializer(serializers.ModelSerializer):
         """
         model = get_user_model()
         fields = ['username', 'email', 'password']  # default fields required
-        extra_fields = {'password': {'write_only': True}}
+        extra_kwargs = {
+            'password': {'write_only': True},
+        }
 
-    def __init__(self, *args, fields=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         """
             Initialize the serializer with optional field filtering.
 
@@ -34,42 +36,19 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         super().__init__(*args, **kwargs)
 
-        if fields is not None:
-            self.Meta.fields = fields  # if user gave the fields explicitly
+        available_fields = {
+            field.name for field in self.Meta.model._meta.fields
+        }
+        requested_fields = set(self.Meta.fields)
 
-        else:
-            #  filtering fields to those available in the model
-            model_fields = {
-                field.name for field in self.Meta.model._meta.fields
-            }
-            self.Meta.fields = [
-                field for field in self.Meta.fields if field in model_fields
-            ]
+        # Removing fields not present in the custom/default user model
+        for field in requested_fields - available_fields:
+            self.fields.pop(field, None)
 
-        # regenerating self.fields based on the updated Meta.fields
-        self.fields = self.get_fields()
-
-    def validate(self, data):
-        """
-            Used to perform validation logic on the input data.
-
-            Args:
-                data (dict): The input data to validate.
-
-            Returns:
-                dict: The validated data.
-
-            Raises:
-                ValidationError: If the validation fails.
-        """
-
-        UserModel = get_user_model()
-        username_field = UserModel.USERNAME_FIELD
-
-        if username_field not in data:
-            raise serializers.ValidationError(f'{username_field} is required!')
-
-        return data
+        # Ensure username field is available and required
+        username_field = getattr(self.Meta.model, 'USERNAME_FIELD', 'username')
+        if username_field in available_fields:
+            self.fields[username_field] = serializers.CharField(required=True)
 
     def create(self, validated_data):
         """
