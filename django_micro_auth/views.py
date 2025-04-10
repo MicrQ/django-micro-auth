@@ -4,7 +4,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django_micro_auth import MICRO_AUTH_MODE
 from django.contrib.auth import get_user_model
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
+from django.core.exceptions import ImproperlyConfigured
 from django.contrib.auth import authenticate, login, logout
 from .serializers import RegisterSerializer, LoginSerializer
 from drf_spectacular.utils import extend_schema, OpenApiResponse
@@ -12,7 +13,10 @@ from drf_spectacular.utils import extend_schema, OpenApiResponse
 
 # importing Token if token auth is enabled
 if MICRO_AUTH_MODE == 'token':
-    from rest_framework.authtoken.models import Token
+    try:
+        from rest_framework.authtoken.models import Token
+    except ImportError:
+        Token = None
 
 
 class RegisterAPIView(APIView):
@@ -128,3 +132,68 @@ class LoginAPIView(APIView):
             )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class LogoutAPIView(APIView):
+    """ API view for handling user logout """
+
+    permission_classes = [IsAuthenticated]
+
+    if MICRO_AUTH_MODE == 'token':
+        from rest_framework.authentication import TokenAuthentication
+        authentication_classes = [TokenAuthentication]
+
+    else:
+        authentication_classes = []
+
+    @extend_schema(
+        request=None,
+        responses={
+            200: OpenApiResponse(
+                response={
+                    'type': 'object',
+                    'properties': {
+                        'message': {'type': 'string',
+                                    'example': 'Logged out successfully'}
+                    }
+                },
+                description="Logout successful,\
+                      session ended or token deleted."
+            ),
+            401: OpenApiResponse(
+                response={
+                    'type': 'object',
+                    'properties': {
+                        'detail': {
+                            'type': 'string',
+                            'example': 'Authentication credentials were not provided.'
+                        }
+                    }
+                },
+                description="User is not authenticated."
+            )
+        },
+        description="Log out the current user,\
+              ending the session or deleting the token."
+    )
+    def post(self, request):
+        """ Handles HTTP POST requests for user logout """
+
+        if MICRO_AUTH_MODE == 'token':
+            if Token is None:
+                raise ImproperlyConfigured(
+                    "Token authentication requires \
+                        'rest_framework.authtoken' in INSTALLED_APPS."
+                )
+
+            # deleting user's token
+            Token.objects.filter(user=request.user).delete()
+
+        else:
+            # ending session if session is used
+            logout(request)
+
+        return Response(
+            {'message': 'Logged out successfully.'},
+            status=status.HTTP_200_OK
+        )
