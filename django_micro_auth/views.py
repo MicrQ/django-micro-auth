@@ -2,10 +2,17 @@
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from django_micro_auth import MICRO_AUTH_MODE
 from django.contrib.auth import get_user_model
-from drf_spectacular.utils import extend_schema
+from rest_framework.permissions import AllowAny
 from django.contrib.auth import authenticate, login, logout
 from .serializers import RegisterSerializer, LoginSerializer
+from drf_spectacular.utils import extend_schema, OpenApiResponse
+
+
+# importing Token if token auth is enabled
+if MICRO_AUTH_MODE == 'token':
+    from rest_framework.authtoken.models import Token
 
 
 class RegisterAPIView(APIView):
@@ -17,8 +24,24 @@ class RegisterAPIView(APIView):
         request=RegisterSerializer,
         responses={
             201: RegisterSerializer,
-            400: RegisterSerializer
-        }
+            400: OpenApiResponse(
+                response={
+                    'type': 'object',
+                    'properties': {
+                        'username': {'type': 'string',
+                                     'example': 'This username \
+                                        is already taken.'},
+                        'email': {'type': 'string',
+                                  'example': 'This email is already taken.'},
+                        'password': {'type': 'string',
+                                     'example': 'This field is required.'},
+                    },
+                    'additionalProperties': True
+                },
+                description="Invalid inputs or malformed data."
+            )
+        },
+        description="Handles user registration."
     )
     def post(self, request):
         """ Handles HTTP POST requests for user registration """
@@ -36,15 +59,35 @@ class LoginAPIView(APIView):
     """ API View for handling user login """
 
     authentication_classes = []
-    permission_classes = []
 
     @extend_schema(
         request=LoginSerializer,
         responses={
-            200: "Logged in successfully.",
-            400: "Invalid credentials or maformed request.",
+            200: LoginSerializer,
+            400: OpenApiResponse(
+                response={
+                    'type': 'object',
+                    'properties': {
+                        'error': {
+                            'type': 'string',
+                            'example': 'Invalid username or password'
+                        },
+                        'password': {
+                            'type': 'string',
+                            'example': 'This field is required.'
+                        },
+                        'username': {
+                            'type': 'string',
+                            'example': 'This field is required.'
+                        },
+                    },
+                    'additionalProperties': True
+                },
+                description="Invalid credentials or malformed request."
+            ),
         },
-        description="Authenticate a user and start a session."
+        description="Authenticate a user and start \
+            a session or return a token."
     )
     def post(self, request):
         """ Handles HTTP POST request for user login """
@@ -62,10 +105,20 @@ class LoginAPIView(APIView):
 
             user = authenticate(request=request, **auth_kwargs)
             if user:
-                login(request, user)
+                response = {"message": "Logged in successfully."}
+
+                if MICRO_AUTH_MODE == 'token':
+                    """ for token based authentications """
+
+                    token, created = Token.objects.get_or_create(user=user)
+                    response['micro-auth-token'] = token.key
+
+                else:
+                    """ for session based auth """
+                    login(request, user)
 
                 return Response(
-                    {"message": "Logged in successfully."},
+                    response,
                     status=status.HTTP_200_OK
                 )
 
