@@ -94,12 +94,17 @@ class RegisterSerializer(serializers.ModelSerializer):
             uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
             token = PasswordResetTokenGenerator().make_token(user)
             verify_url = self.context['request'].build_absolute_uri(
-                reverse('verify-email', kwargs={'uidb64': uidb64, 'token': token})
+                reverse(
+                    'verify-email',
+                    kwargs={'uidb64': uidb64, 'token': token}
+                )
             )
 
             send_mail(
                 subject="Verify Your Email Address",
-                message=f"Please verify your email by clicking this link: {verify_url}",
+                message=f"Please verify your email by clicking this link: {
+                    verify_url
+                }",
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[user.email],
             )
@@ -160,3 +165,26 @@ class LoginSerializer(serializers.ModelSerializer):
             username_field: data[username_field],
             'password': data['password']
         }
+
+
+class PasswordChangeSerializer(serializers.Serializer):
+    """ used for changing user password """
+
+    old_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True)
+
+    def validate_old_password(self, value):
+
+        if not self.context['request'].user.check_password(value):
+            raise serializers.ValidationError('Old password is incorrect.')
+
+        return value
+
+    def validate_new_password(self, value):
+
+        if len(value) < 6:
+            raise serializers.ValidationError(
+                'Password must be at least 6 characters long.'
+            )
+
+        return value
