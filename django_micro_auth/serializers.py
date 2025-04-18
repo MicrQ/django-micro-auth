@@ -2,9 +2,18 @@
     contains serializers forserialization and deserialization
     of authentication-related data
 """
-from rest_framework import serializers
-from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.db import IntegrityError
+from rest_framework import serializers
+from django.core.mail import send_mail
+from django.utils.encoding import force_bytes
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ImproperlyConfigured
+from django.utils.http import (
+    urlsafe_base64_encode, urlsafe_base64_decode
+)
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.urls import reverse
 
 
 UserModel = get_user_model()
@@ -15,6 +24,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         used to validate and process data for creating
         a new user instance.
     """
+
+    email = serializers.EmailField(required=True)
 
     class Meta:
         """
@@ -40,25 +51,28 @@ class RegisterSerializer(serializers.ModelSerializer):
         available_fields = {
             field.name for field in self.Meta.model._meta.fields
         }
-        requested_fields = set(self.Meta.fields)
 
-        # Removing fields not present in the custom/default user model
-        for field in requested_fields - available_fields:
-            self.fields.pop(field, None)
+        if 'email' not in available_fields:
+            raise ImproperlyConfigured(
+                'User model must have an email field for verification.'
+            )
 
-        # Ensure username field is available and required
+        # Handling dynamic username_field
         username_field = getattr(
             self.Meta.model, 'USERNAME_FIELD', 'username'
         )
-        if username_field in available_fields:
-            if username_field == 'email':
-                self.fields[username_field] = serializers.EmailField(
-                    required=True
-                )
-            else:
+        if username_field != 'email':
+            if username_field in available_fields:
                 self.fields[username_field] = serializers.CharField(
                     required=True
                 )
+            else:
+                self.fields.pop(username_field, None)
+
+        # Removing fields not present in the custom/default user model
+        requested_fields = set(self.Meta.fields) - {'email'}
+        for field in requested_fields - available_fields:
+            self.fields.pop(field, None)
 
     def create(self, validated_data):
         """
@@ -73,7 +87,24 @@ class RegisterSerializer(serializers.ModelSerializer):
         """
 
         try:
-            return UserModel.objects.create_user(**validated_data)
+            user = UserModel.objects.create_user(
+                **validated_data, is_active=False
+            )
+            # sending verification email
+            uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+            token = PasswordResetTokenGenerator().make_token(user)
+            verify_url = self.context['request'].build_absolute_uri(
+                reverse('verify-email', kwargs={'uidb64': uidb64, 'token': token})
+            )
+
+            send_mail(
+                subject="Verify Your Email Address",
+                message=f"Please verify your email by clicking this link: {verify_url}",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+            )
+
+            return user
 
         except IntegrityError as e:
             username_field = getattr(UserModel, 'USERNAME_FIELD', 'username')
