@@ -32,11 +32,12 @@ class RegisterAPIView(APIView):
                 response={
                     'type': 'object',
                     'properties': {
-                        'username': {'type': 'string',
-                                     'example': 'This username \
-                                        is already taken.'},
+                        'username': {
+                            'type': 'string',
+                            'example': 'This username is required/taken.'
+                        },
                         'email': {'type': 'string',
-                                  'example': 'This email is already taken.'},
+                                  'example': 'This email is required/taken.'},
                         'password': {'type': 'string',
                                      'example': 'This field is required.'},
                     },
@@ -45,12 +46,14 @@ class RegisterAPIView(APIView):
                 description="Invalid inputs or malformed data."
             )
         },
-        description="Handles user registration."
+        description="Handles user registration. Email is required to verify."
     )
     def post(self, request):
         """ Handles HTTP POST requests for user registration """
 
-        serializer = RegisterSerializer(data=request.data)
+        serializer = RegisterSerializer(
+            data=request.data, context={'request': request}
+        )
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data,
