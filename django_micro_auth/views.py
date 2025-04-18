@@ -7,8 +7,15 @@ from django.contrib.auth import get_user_model
 from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ImproperlyConfigured
 from django.contrib.auth import authenticate, login, logout
-from .serializers import RegisterSerializer, LoginSerializer
+from .serializers import (
+    PasswordChangeSerializer,
+    RegisterSerializer,
+    LoginSerializer
+)
 from drf_spectacular.utils import extend_schema, OpenApiResponse
+from rest_framework.authentication import (
+    TokenAuthentication, SessionAuthentication
+)
 
 
 # importing Token if token auth is enabled
@@ -199,4 +206,78 @@ class LogoutAPIView(APIView):
         return Response(
             {'message': 'Logged out successfully.'},
             status=status.HTTP_200_OK
+        )
+
+
+class PasswordChangeAPIView(APIView):
+    """ Used for user password changing """
+
+    permission_classes = [IsAuthenticated]
+    if MICRO_AUTH_MODE == 'token':
+        authentication_classes = [TokenAuthentication]
+    else:
+        authentication_classes = [SessionAuthentication]
+
+    @extend_schema(
+        request=PasswordChangeSerializer,
+        responses={
+            200: OpenApiResponse(
+                response={
+                    'type': 'object',
+                    'properties': {
+                        'message': {
+                            'type': 'string',
+                            'example': 'Password changed successfully.'
+                        }
+                    }
+                }
+            ),
+            400: OpenApiResponse(
+                response={
+                    'type': 'object',
+                    'properties': {
+                        'old_password': {
+                            'type': 'string',
+                            'example': 'Old password is incorrect.'
+                        },
+                        'new_password': {
+                            'type': 'string',
+                            'example': 'Password must be at least 8 characters long.'
+                        }
+                    }
+                }
+            ),
+            401: OpenApiResponse(
+                response={
+                    'type': 'object',
+                    'properties': {
+                        'detail': {
+                            'type': 'string',
+                            'example': 'Authentication credentials were not provided.'
+                        }
+                    }
+                }
+            )
+        }
+    )
+    def post(self, request):
+        """ Used to help user change password """
+
+        serializer = PasswordChangeSerializer(
+            data=request.data, context={'request': request})
+        
+        if serializer.is_valid():
+            request.user.set_password(
+                serializer.validated_data['new_password']
+            )
+            request.user.save()
+
+            return Response(
+                {'message': 'Password changed successfully.'},
+                status=status.HTTP_200_OK
+            )
+
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
         )
