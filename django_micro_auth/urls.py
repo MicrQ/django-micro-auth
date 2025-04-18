@@ -1,6 +1,7 @@
 """ definitions of URL patterns for the application """
 from django.urls import path
 from .views import (
+    PasswordResetAPIView,
     RegisterAPIView,
     LoginAPIView,
     LogoutAPIView,
@@ -16,5 +17,10 @@ urlpatterns = [
         'password/change/',
         PasswordChangeAPIView.as_view(),
         name='password_change'
-    )
+    ),
+    path(
+        'password/reset/',
+        PasswordResetAPIView.as_view(),
+        name='password_reset'
+    ), # requires EMAIL_BACKEND and DEFAULT_FROM_EMAIL set
 ]

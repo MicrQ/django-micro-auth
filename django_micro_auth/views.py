@@ -1,7 +1,11 @@
 """ contains the views for the django-micro-auth application """
+from django.conf import settings
+from django.urls import reverse
 from rest_framework import status
+from django.core.mail import send_mail
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from django.utils.encoding import force_bytes
 from django_micro_auth import MICRO_AUTH_MODE
 from django.contrib.auth import get_user_model
 from rest_framework.permissions import IsAuthenticated
@@ -9,6 +13,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.contrib.auth import authenticate, login, logout
 from .serializers import (
     PasswordChangeSerializer,
+    PasswordResetSerializer,
     RegisterSerializer,
     LoginSerializer
 )
@@ -16,6 +21,8 @@ from drf_spectacular.utils import extend_schema, OpenApiResponse
 from rest_framework.authentication import (
     TokenAuthentication, SessionAuthentication
 )
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 
 
 # importing Token if token auth is enabled
@@ -281,3 +288,65 @@ class PasswordChangeAPIView(APIView):
             serializer.errors,
             status=status.HTTP_400_BAD_REQUEST
         )
+
+
+class PasswordResetAPIView(APIView):
+    permission_classes = []
+    authentication_classes = []
+
+    @extend_schema(
+        request=PasswordResetSerializer,
+        responses={
+            200: OpenApiResponse(
+                response={
+                    'type': 'object',
+                    'properties': {
+                        'message': {
+                            'type': 'string',
+                            'example': 'Password reset email sent.'
+                        }
+                    }
+                }
+            ),
+            400: OpenApiResponse(
+                response={
+                    'type': 'object',
+                    'properties': {
+                        'email': {
+                            'type': 'string',
+                            'example': 'No user found with this email address.'
+                        }
+                    }
+                }
+            )
+        }
+    )
+    def post(self, request):
+        serializer = PasswordResetSerializer(data=request.data)
+        if serializer.is_valid():
+
+            user = get_user_model().objects.get(
+                email=serializer.validated_data['email']
+            )
+            uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+            token = PasswordResetTokenGenerator().make_token(user)
+            reset_url = self.context['request'].build_absolute_uri(
+                reverse(
+                    'verify-email',
+                    kwargs={'uidb64': uidb64, 'token': token}
+                )
+            )
+
+            send_mail(
+                subject='Password Reset Request',
+                message=f'Click this link to reset your password: {reset_url}',
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+            )
+
+            return Response(
+                {'message': 'Password reset email sent.'},
+                status=status.HTTP_200_OK
+            )
+        
+        return  Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
