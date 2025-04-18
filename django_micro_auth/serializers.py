@@ -188,3 +188,20 @@ class PasswordChangeSerializer(serializers.Serializer):
             )
 
         return value
+
+
+class PasswordResetSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        user = UserModel.objects.filter(email=value).first()
+
+        if not user:
+            raise serializers.ValidationError(
+                'No user found with this email address.'
+            )
+        
+        if not user.is_active:
+            raise serializers.ValidationError('Email address is not verified')
+        
+        return value
