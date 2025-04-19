@@ -51,6 +51,20 @@ class RegisterSerializerTests(BaseAuthTestCase):
 
         request = self.factory.post('auth/register/')
         data = {'username': 'testuser', 'password': 'pass@123'}
-        serializer = RegisterSerializer(data=data, context={'request': request})
+        serializer = RegisterSerializer(
+            data=data, context={'request': request}
+        )
         self.assertFalse(serializer.is_valid())
         self.assertIn('email', serializer.errors)
+
+    def test_register_duplicated_username(self):
+        """ test to check if a user can register with already used username """
+
+        self.create_user()
+        request = self.factory.post('auth/register/')
+        serializer = RegisterSerializer(
+            data=self.user_data, context={'request': request}
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('username', serializer.errors)
+        self.assertEqual(serializer.errors['username'][0], 'This username is already taken.')

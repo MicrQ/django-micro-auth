@@ -74,6 +74,26 @@ class RegisterSerializer(serializers.ModelSerializer):
         for field in requested_fields - available_fields:
             self.fields.pop(field, None)
 
+    def validate(self, data):
+        """ ensures valid user registration """
+        username_field = getattr(UserModel, 'USERNAME_FIELD', 'username')
+        if username_field == 'username':
+            user = UserModel.objects.filter(
+                username=data.get(username_field)
+            )
+
+            if user:
+                raise serializers.ValidationError(
+                    {'username': f'This username is already taken.'}
+                )
+
+        if UserModel.objects.filter(email=data.get('email')):
+            raise serializers.ValidationError(
+                {'email': 'This email is already taken.'}
+            )
+        
+        return data
+
     def create(self, validated_data):
         """
         Creates and returns a new instance using the provided validated data.
