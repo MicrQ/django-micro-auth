@@ -236,3 +236,30 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
             )
         
         return data
+
+
+class VerifyEmailSerializer(serializers.Serializer):
+
+    uidb64 = serializers.CharField()
+    token = serializers.CharField()
+
+    def validate(self, data):
+        try:
+            uid = urlsafe_base64_decode(data['uidb64']).decode()
+            user = get_user_model().objects.filter(pk=uid)
+
+        except (ValueError, get_user_model().DoesNotExist):
+            raise serializers.ValidationError(
+                {'uid64': 'Invalid user ID.'}
+            )
+
+        token_generator = PasswordResetTokenGenerator()
+        if not token_generator.check_token(user, data['token']):
+            raise serializers.ValidationError(
+                {'token': 'Invalid or expired token.'}
+            )
+
+        if user.is_active:
+            raise serializers.ValidationError(
+                {'message': 'Email is already verified.'}
+            )
