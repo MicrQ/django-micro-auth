@@ -1,8 +1,10 @@
 import json
-from django.test import RequestFactory, TestCase
+from django.core import mail
+from unittest.mock import patch
 from rest_framework.test import APIClient
 from django_micro_auth import MICRO_AUTH_MODE
 from django.contrib.auth import get_user_model
+from django.test import RequestFactory, TestCase
 from django_micro_auth.serializers import RegisterSerializer
 
 
@@ -68,3 +70,17 @@ class RegisterSerializerTests(BaseAuthTestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn('username', serializer.errors)
         self.assertEqual(serializer.errors['username'][0], 'This username is already taken.')
+
+    @patch('django.core.mail.send_mail')
+    def test_register_sends_verification_email(self, mock_send_mail):
+        """ test to check if verification email is being sent """
+
+        request = self.factory.post('auth/register/')
+        serializer = RegisterSerializer(
+            data=self.user_data, context={'request': request}
+        )
+        self.assertTrue(serializer.is_valid())
+        serializer.save()
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].subject, 'Verify Your Email Address')
