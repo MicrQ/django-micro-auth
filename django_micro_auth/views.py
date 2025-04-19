@@ -477,3 +477,77 @@ class VerifyEmailAPIView(APIView):
         return Response(
             serializer.errors, status=status.HTTP_400_BAD_REQUEST
         )
+
+
+class ResendVerifyEmailAPIView(APIView):
+
+    permission_classes = []
+    authentication_classes = []
+
+    @extend_schema(
+        request=PasswordResetSerializer,
+        responses={
+            200: OpenApiResponse(
+                response={
+                    'type': 'object',
+                    'properties': {
+                        'message': {
+                            'type': 'string',
+                            'example': 'Verification email resent'
+                        }
+                    }
+                }
+            ),
+            400: OpenApiResponse(
+                response={
+                    'type': 'object',
+                    'properties': {
+                        'email': {
+                            'type': 'string',
+                            'example': 'No user found with this email address.'
+                        }
+                    }
+                }
+            )
+        },
+        description="Resend a verification email for an unverified user account."
+    )
+    def post(self, request):
+        serializer = PasswordResetSerializer(data=request.data)
+        if serializer.is_valid():
+            user = get_user_model().objects.get(
+                email=serializer.validated_data['email']
+            )
+            if user.is_active:
+                return Response(
+                    {'message': 'Email is already verified.'},
+                    status=status.HTTP_200_OK
+                )
+
+            uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+            token = PasswordResetTokenGenerator().make_token(user)
+            verify_url = request.build_absolute_uri(
+                reverse(
+                    'verify-email',
+                    kwargs={'uidb64': uidb64, 'token': token}
+                )
+            )
+
+            send_mail(
+                subject='Verify You Email Address',
+                message='Please verify your email by clicking this link: {}'.format(
+                    verify_url
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email]
+            )
+
+            return Response(
+                {'message': 'Verification email resent.'},
+                status=status.HTTP_200_OK
+            )
+
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
