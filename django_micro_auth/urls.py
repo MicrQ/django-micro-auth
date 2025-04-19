@@ -4,6 +4,7 @@ from .views import (
     LoginAPIView,
     LogoutAPIView,
     RegisterAPIView,
+    VerifyEmailAPIView,
     PasswordResetAPIView,
     PasswordChangeAPIView,
     PasswordResetConfirmAPIView,
@@ -28,4 +29,8 @@ urlpatterns = [
         'password/reset/confirm/<uidb64>/<token>/',
         PasswordResetConfirmAPIView.as_view(),
         name='password_reset_confirm'),
+    path(
+        'verify-email/<uidb64>/<token>/',
+        VerifyEmailAPIView.as_view(), name='verify-email'
+    )
 ]

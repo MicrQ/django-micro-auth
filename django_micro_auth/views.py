@@ -17,6 +17,7 @@ from .serializers import (
     PasswordResetSerializer,
     PasswordChangeSerializer,
     PasswordResetConfirmSerializer,
+    VerifyEmailSerializer,
 )
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 from rest_framework.authentication import (
@@ -409,6 +410,67 @@ class PasswordResetConfirmAPIView(APIView):
 
             return Response(
                 {'message': 'Password reset successfully.'},
+                status=status.HTTP_200_OK
+            )
+
+        return Response(
+            serializer.errors, status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+class VerifyEmailAPIView(APIView):
+    permission_classes = []
+    authentication_classes = []
+
+    @extend_schema(
+        request=VerifyEmailSerializer,
+        responses={
+            200: OpenApiResponse(
+                response={
+                    'type': 'object',
+                    'properties': {
+                        'message': {
+                            'type': 'string',
+                            'example': 'Email verified successfully'
+                        }
+                    }
+                }
+            ),
+            400: OpenApiResponse(
+                response={
+                    'type': 'object',
+                    'properties': {
+                        'uidb64': {
+                            'type': 'string',
+                            'example': 'Invalid user ID.'
+                        },
+                        'token': {
+                            'type': 'string',
+                            'example': 'Invalid or expired token.'
+                        },
+                        'message': {
+                            'type': 'string',
+                            'example': 'Email is already verified.'
+                        }
+                    }
+                }
+            )
+        },
+        description="Verify a user's email address using a link sent during registration."
+    )
+    def post(self, request, uidb64, token):
+        serializer = VerifyEmailSerializer(
+            data={'uidb64': uidb64, 'token': token}
+        )
+
+        if serializer.is_valid():
+            uid = urlsafe_base64_decode(uidb64).decode()
+            user = get_user_model().objects.get(pk=uid)
+            user.is_active = True
+            user.save()
+
+            return Response(
+                {'message': 'Email verifed successfully'},
                 status=status.HTTP_200_OK
             )
 
