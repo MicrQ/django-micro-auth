@@ -102,9 +102,9 @@ class RegisterSerializer(serializers.ModelSerializer):
 
             send_mail(
                 subject="Verify Your Email Address",
-                message=f"Please verify your email by clicking this link: {
+                message="Please verify your email by clicking this link: {}".format(
                     verify_url
-                }",
+                ),
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[user.email],
             )
@@ -201,8 +201,8 @@ class PasswordResetSerializer(serializers.Serializer):
                 'No user found with this email address.'
             )
         
-        if not user.is_active:
-            raise serializers.ValidationError('Email address is not verified')
+        # if not user.is_active:
+        #     raise serializers.ValidationError('Email address is not verified')
         
         return value
 
@@ -246,7 +246,7 @@ class VerifyEmailSerializer(serializers.Serializer):
     def validate(self, data):
         try:
             uid = urlsafe_base64_decode(data['uidb64']).decode()
-            user = get_user_model().objects.filter(pk=uid)
+            user = get_user_model().objects.filter(pk=uid).first()
 
         except (ValueError, get_user_model().DoesNotExist):
             raise serializers.ValidationError(
@@ -263,3 +263,5 @@ class VerifyEmailSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 {'message': 'Email is already verified.'}
             )
+
+        return data

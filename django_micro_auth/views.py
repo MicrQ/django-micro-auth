@@ -332,7 +332,7 @@ class PasswordResetAPIView(APIView):
             )
             uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
             token = PasswordResetTokenGenerator().make_token(user)
-            reset_url = self.context['request'].build_absolute_uri(
+            reset_url = request.build_absolute_uri(
                 reverse(
                     'password_reset_confirm',
                     kwargs={'uidb64': uidb64, 'token': token}
@@ -515,9 +515,9 @@ class ResendVerifyEmailAPIView(APIView):
     def post(self, request):
         serializer = PasswordResetSerializer(data=request.data)
         if serializer.is_valid():
-            user = get_user_model().objects.get(
+            user = get_user_model().objects.filter(
                 email=serializer.validated_data['email']
-            )
+            ).first()
             if user.is_active:
                 return Response(
                     {'message': 'Email is already verified.'},
