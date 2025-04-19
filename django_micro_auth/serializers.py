@@ -205,3 +205,34 @@ class PasswordResetSerializer(serializers.Serializer):
             raise serializers.ValidationError('Email address is not verified')
         
         return value
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+
+    new_password = serializers.CharField(write_only=True)
+    uid64 = serializers.CharField()
+    token = serializers.CharField()
+
+    def validate(self, data):
+
+        try:
+            uid = urlsafe_base64_decode(data['uidb64']).decode()
+            user = get_user_model().objects.get(pk=uid)
+
+        except (ValueError, get_user_model().DoesNotExist):
+            raise serializers.ValidationError(
+                {'uidb64': 'Invalid user ID.'}
+            )
+        
+        token_genetator = PasswordResetTokenGenerator()
+        if not token_genetator.check_token(user, data['token']):
+            raise serializers.ValidationError(
+                {'token': 'Invalid or expired token.'}
+            )
+        
+        if len(data['new_password']) < 6:
+            raise serializers.ValidationError(
+                {'new_password': 'Password must be at least 6 characters.'}
+            )
+        
+        return data
