@@ -12,10 +12,11 @@ from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ImproperlyConfigured
 from django.contrib.auth import authenticate, login, logout
 from .serializers import (
-    PasswordChangeSerializer,
-    PasswordResetSerializer,
+    LoginSerializer,
     RegisterSerializer,
-    LoginSerializer
+    PasswordResetSerializer,
+    PasswordChangeSerializer,
+    PasswordResetConfirmSerializer,
 )
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 from rest_framework.authentication import (
@@ -332,7 +333,7 @@ class PasswordResetAPIView(APIView):
             token = PasswordResetTokenGenerator().make_token(user)
             reset_url = self.context['request'].build_absolute_uri(
                 reverse(
-                    'verify-email',
+                    'password_reset_confirm',
                     kwargs={'uidb64': uidb64, 'token': token}
                 )
             )
@@ -350,3 +351,67 @@ class PasswordResetAPIView(APIView):
             )
         
         return  Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PasswordResetConfirmAPIView(APIView):
+    permission_classes = []
+    authentication_classes = []
+
+    @extend_schema(
+        request=PasswordResetConfirmSerializer,
+        responses={
+            200: OpenApiResponse(
+                response={
+                    'type': 'object',
+                    'properties': {
+                        'message': {
+                            'type': 'string',
+                            'example': 'Password reset successfully'
+                        }
+                    }
+                }
+            ),
+            400: OpenApiResponse(
+                response={
+                    'type': 'object',
+                    'properties': {
+                        'uidb64': {
+                            'type': 'string',
+                            'example': 'Invalid user ID.'
+                        },
+                        'token': {
+                            'type': 'string',
+                            'example': 'Invalid or expired token.'
+                        },
+                        'new_password': {
+                            'type': 'string',
+                            'example': 'Password must be at least 8 characters long.'
+                        }
+                    }
+                }
+            )
+        }
+    )
+    def post(self, request, uidb64, token):
+        serializer = PasswordResetConfirmSerializer(
+            data={
+                'uidb64': uidb64,
+                'token': token,
+                'new_password': request.data.get('new_password')
+            }
+        )
+
+        if serializer.is_valid():
+            uid = urlsafe_base64_decode(uidb64).decode()
+            user = get_user_model().objects.get(pk=uid)
+            user.set_password(serializer.validated_data['new_password'])
+            user.save()
+
+            return Response(
+                {'message': 'Password reset successfully.'},
+                status=status.HTTP_200_OK
+            )
+
+        return Response(
+            serializer.errors, status=status.HTTP_400_BAD_REQUEST
+        )
