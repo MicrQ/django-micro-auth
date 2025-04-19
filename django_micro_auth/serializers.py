@@ -210,7 +210,7 @@ class PasswordResetSerializer(serializers.Serializer):
 class PasswordResetConfirmSerializer(serializers.Serializer):
 
     new_password = serializers.CharField(write_only=True)
-    uid64 = serializers.CharField()
+    uidb64 = serializers.CharField()
     token = serializers.CharField()
 
     def validate(self, data):
