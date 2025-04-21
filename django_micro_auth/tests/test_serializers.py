@@ -185,3 +185,15 @@ class MicroAuthIntegrationTests(APITestCase):
             res.data['non_field_errors'][0],
             f'Invalid {username_field} or password.'
         )
+
+    def test_login_verified_user_token(self):
+        with self.settings(MICRO_AUTH_MODE='token'):
+            self.user.is_active = True
+            self.user.save()
+            response = self.client.post(reverse('login'), {
+                'username': 'testuser',
+                'password': 'pass@123'
+            }, format='json')
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data['message'], 'Logged in successfully.')
+            self.assertIn('micro-auth-token', response.data)
