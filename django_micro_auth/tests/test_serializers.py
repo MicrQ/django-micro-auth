@@ -3,15 +3,22 @@ from django.core import mail
 from unittest.mock import patch
 from django.urls import reverse
 from rest_framework import status
+from django.utils.encoding import force_bytes
 from django_micro_auth import MICRO_AUTH_MODE
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
+from django.utils.http import (
+    urlsafe_base64_decode, urlsafe_base64_encode
+)
 from rest_framework.test import APITestCase, APIClient
 from django_micro_auth.serializers import (
     LoginSerializer,
+    PasswordResetConfirmSerializer,
     RegisterSerializer,
+    PasswordResetSerializer,
     PasswordChangeSerializer,
 )
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
 
 
 UserModel = get_user_model()
@@ -174,6 +181,76 @@ class PasswordChangeSerializerTests(BaseAuthTestCase):
         )
         self.assertFalse(serializer.is_valid())
         self.assertIn('old_password', serializer.errors)
+
+
+class PasswordResetSerializerTests(BaseAuthTestCase):
+    """ tests for password resetting functionality """
+
+    def setUp(self):
+        super().setUp()
+        self.user = self.create_user(is_active=True)
+
+    def test_password_reset_valid_email(self):
+        """ test changing passeword for valid account """
+        serializer = PasswordResetSerializer(data={'email': 'test@user.com'})
+        self.assertTrue(serializer.is_valid())
+        self.assertEqual(serializer.validated_data['email'], 'test@user.com')
+
+    def test_password_reset_nonexistent_email(self):
+        """ test for invalid or unknown account/email """
+        serializer = PasswordResetSerializer(data={'email': 'fake@email.com'})
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('email', serializer.errors)
+
+    def test_password_reset_unverified_user(self):
+        """ test to check if unverified user can reset their password """
+
+        self.user_data['email'] = 'new@user.com'
+        self.user_data['username'] = 'testuser1'
+        self.user = self.create_user(is_active=False)
+        serializer = PasswordResetSerializer(data={'email': 'new@user.com'})
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('email', serializer.errors)
+        self.assertEqual(serializer.errors['email'][0], 'Email address is not verified.')
+
+
+class PasswordResetConfirmSerializerTests(BaseAuthTestCase):
+    """ tests to check functionality of resetting password """
+    def setUp(self):
+        super().setUp()
+        self.user = self.create_user(is_active=True)
+        self.uidb64 = urlsafe_base64_encode(force_bytes(self.user.pk))
+        self.token = PasswordResetTokenGenerator().make_token(self.user)
+
+    def test_confirm_valid(self):
+        """ test with valid data """
+        serializer = PasswordResetConfirmSerializer(data={
+            'uidb64': self.uidb64,
+            'token': self.token,
+            'new_password': 'new@123'
+        })
+        self.assertTrue(serializer.is_valid())
+        self.assertEqual(serializer.validated_data['new_password'], 'new@123')
+
+    def test_confirm_invalid_uidb64(self):
+        """ test with invalid uidb64 """
+        serializer = PasswordResetConfirmSerializer(data={
+            'uidb64': 'invalid',
+            'token': self.token,
+            'new_password': 'new@pass'
+        })
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('uidb64', serializer.errors)
+
+    def test_confirm_invalid_token(self):
+        """ test with invalid token """
+        serializer = PasswordResetConfirmSerializer(data={
+            'uidb64': self.uidb64,
+            'token': 'invalid-token',
+            'new_password': 'new@123'
+        })
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('token', serializer.errors)
 
 
 class MicroAuthIntegrationTests(APITestCase):

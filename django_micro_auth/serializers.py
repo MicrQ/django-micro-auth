@@ -235,8 +235,8 @@ class PasswordResetSerializer(serializers.Serializer):
                 'No user found with this email address.'
             )
         
-        # if not user.is_active:
-        #     raise serializers.ValidationError('Email address is not verified')
+        if not user.is_active:
+            raise serializers.ValidationError('Email address is not verified.')
         
         return value
 
