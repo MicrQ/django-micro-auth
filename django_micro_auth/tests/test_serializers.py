@@ -1,10 +1,12 @@
 import json
 from django.core import mail
 from unittest.mock import patch
-from rest_framework.test import APIClient
+from django.urls import reverse
+from rest_framework import status
 from django_micro_auth import MICRO_AUTH_MODE
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
+from rest_framework.test import APITestCase, APIClient
 from django_micro_auth.serializers import LoginSerializer, RegisterSerializer
 
 
@@ -20,7 +22,6 @@ class BaseAuthTestCase(TestCase):
             'password': 'pass@123'
         }
 
-        self.client = APIClient()
         self.factory = RequestFactory() # for creating moke request
 
     def create_user(self, **kwargs):
@@ -36,7 +37,7 @@ class RegisterSerializerTests(BaseAuthTestCase):
     def test_register_valid_data(self):
         """ tests user registration with valid data """
 
-        request = self.factory.post('auth/register/')
+        request = self.factory.post(reverse('register'))
         serializer = RegisterSerializer(
             data=self.user_data, context={'request': request}
         )
@@ -51,7 +52,7 @@ class RegisterSerializerTests(BaseAuthTestCase):
     def test_register_missing_email(self):
         """ test to check if a user can register without email """
 
-        request = self.factory.post('auth/register/')
+        request = self.factory.post(reverse('register'))
         data = {'username': 'testuser', 'password': 'pass@123'}
         serializer = RegisterSerializer(
             data=data, context={'request': request}
@@ -63,7 +64,7 @@ class RegisterSerializerTests(BaseAuthTestCase):
         """ test to check if a user can register with already used username """
 
         self.create_user()
-        request = self.factory.post('auth/register/')
+        request = self.factory.post(reverse('register'))
         serializer = RegisterSerializer(
             data=self.user_data, context={'request': request}
         )
@@ -75,7 +76,7 @@ class RegisterSerializerTests(BaseAuthTestCase):
     def test_register_sends_verification_email(self, mock_send_mail):
         """ test to check if verification email is being sent """
 
-        request = self.factory.post('auth/register/')
+        request = self.factory.post(reverse('register'))
         serializer = RegisterSerializer(
             data=self.user_data, context={'request': request}
         )
@@ -92,7 +93,9 @@ class LoginSerializerTests(BaseAuthTestCase):
     def setUp(self):
         super().setUp()
         self.user = self.create_user(is_active=True) # Verified user for test
-        self.context = {'request': self.factory.post('auth/login/')}
+        self.context = {
+            'request': self.factory.post(reverse('login'))
+        }
 
     def test_login_valid_credentials(self):
         """ test to check valid user login attempt """
@@ -135,3 +138,30 @@ class LoginSerializerTests(BaseAuthTestCase):
         )
         self.assertFalse(serializer.is_valid())
         self.assertIn('non_field_errors', serializer.errors)
+
+
+class MicroAuthIntegrationTests(APITestCase):
+    """ Tests to check the whole authentication process works together """
+
+    def setUp(self):
+        self.user_data = {
+            'username': 'testuser',
+            'email': 'user@email.com',
+            'password': 'pass@123'
+        }
+        self.client = APIClient()
+        self.user = UserModel.objects.create_user(
+            **self.user_data, is_active=False
+        )
+
+    def test_login_unverified_email(self):
+        """ test to check unverified email login """
+
+        res = self.client.post(
+            reverse('login'), {
+                'username': 'testuser',
+                'password': 'pass@123'
+            }, format='json'
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('non_field_errors', res.data)
