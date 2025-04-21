@@ -104,7 +104,7 @@ class LoginSerializerTests(BaseAuthTestCase):
 
         self.assertTrue(serializer.is_valid())
         self.assertEqual(
-            serializer.validated_data['username'], 'testuser'
+            serializer.validated_data, self.user
         )
 
     def test_login_invalid_credentials(self):

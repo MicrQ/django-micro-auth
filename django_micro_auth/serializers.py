@@ -198,10 +198,7 @@ class LoginSerializer(serializers.ModelSerializer):
                 {'non_field_errors': 'Email address is not verified.'}
             )
 
-        return {
-            username_field: data[username_field],
-            'password': data['password']
-        }
+        return user
 
 
 class PasswordChangeSerializer(serializers.Serializer):

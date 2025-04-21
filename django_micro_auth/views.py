@@ -115,40 +115,31 @@ class LoginAPIView(APIView):
     def post(self, request):
         """ Handles HTTP POST request for user login """
 
-        serializer = LoginSerializer(data=request.data)
+        serializer = LoginSerializer(
+            data=request.data,
+            context={'request': request}
+        )
 
         if serializer.is_valid():
-            UserModel = get_user_model()
-            username_field = getattr(UserModel, 'USERNAME_FIELD', 'username')
+            user = serializer.validated_data
+            response = {'message': 'Logged in successfully.'}
 
-            auth_kwargs = {
-                username_field: serializer.validated_data[username_field],
-                'password': serializer.validated_data['password']
-            }
+            if MICRO_AUTH_MODE == 'token':
+                """ for token based authentications """
 
-            user = authenticate(request=request, **auth_kwargs)
-            if user:
-                response = {"message": "Logged in successfully."}
+                token, created = Token.objects.get_or_create(user=user)
+                response['micro-auth-token'] = token.key
 
-                if MICRO_AUTH_MODE == 'token':
-                    """ for token based authentications """
-
-                    token, created = Token.objects.get_or_create(user=user)
-                    response['micro-auth-token'] = token.key
-
-                else:
-                    """ for session based auth """
-                    login(request, user)
+            else:
+                """ for session based auth """
+                login(request, user)
 
                 return Response(
                     response,
                     status=status.HTTP_200_OK
                 )
 
-            return Response(
-                {"error": f"Invalid {username_field} or password."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response(response, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -201,8 +192,7 @@ class LogoutAPIView(APIView):
         if MICRO_AUTH_MODE == 'token':
             if Token is None:
                 raise ImproperlyConfigured(
-                    "Token authentication requires \
-                        'rest_framework.authtoken' in INSTALLED_APPS."
+                    "Token authentication requires 'rest_framework.authtoken' in INSTALLED_APPS."
                 )
 
             # deleting user's token
