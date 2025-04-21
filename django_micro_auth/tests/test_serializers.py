@@ -17,6 +17,7 @@ from django_micro_auth.serializers import (
     RegisterSerializer,
     PasswordResetSerializer,
     PasswordChangeSerializer,
+    VerifyEmailSerializer,
 )
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 
@@ -251,6 +252,31 @@ class PasswordResetConfirmSerializerTests(BaseAuthTestCase):
         })
         self.assertFalse(serializer.is_valid())
         self.assertIn('token', serializer.errors)
+
+
+class VerifyEmailSerializerTests(BaseAuthTestCase):
+    def setUp(self):
+        super().setUp()
+        self.user = self.create_user(is_active=False)
+        self.uidb64 = urlsafe_base64_encode(force_bytes(self.user.pk))
+        self.token = PasswordResetTokenGenerator().make_token(self.user)
+
+    def test_verify_valid(self):
+        serializer = VerifyEmailSerializer(data={
+            'uidb64': self.uidb64,
+            'token': self.token
+        })
+        self.assertTrue(serializer.is_valid())
+
+    def test_verify_already_verified(self):
+        self.user.is_active = True
+        self.user.save()
+        serializer = VerifyEmailSerializer(data={
+            'uidb64': self.uidb64,
+            'token': self.token
+        })
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('message', serializer.errors)
 
 
 class MicroAuthIntegrationTests(APITestCase):
