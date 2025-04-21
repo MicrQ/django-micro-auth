@@ -165,3 +165,23 @@ class MicroAuthIntegrationTests(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('non_field_errors', res.data)
+
+    def test_login_invalid_credentials(self):
+        """ testing with invalid credentials """
+
+        username_field = getattr(
+            get_user_model(), 'USERNAME_FIELD', 'username'
+        )
+        self.user.is_active = True
+        self.user.save()
+        res = self.client.post(reverse('login'), {
+            'username': 'testuser',
+            'password': 'wrongpass'
+        }, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('non_field_errors', res.data)
+        self.assertEqual(
+            res.data['non_field_errors'][0],
+            f'Invalid {username_field} or password.'
+        )
