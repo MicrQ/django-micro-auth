@@ -326,6 +326,7 @@ class MicroAuthIntegrationTests(APITestCase):
         )
 
     def test_login_verified_user_token(self):
+        """ test to check if a token is in the response body """
         with self.settings(MICRO_AUTH_MODE='token'):
             self.user.is_active = True
             self.user.save()
@@ -336,3 +337,29 @@ class MicroAuthIntegrationTests(APITestCase):
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             self.assertEqual(response.data['message'], 'Logged in successfully.')
             self.assertIn('micro-auth-token', response.data)
+
+    def test_logout_session(self):
+        """ test logging out """
+
+        self.user.is_active = True
+        self.user.save()
+        token = self.client.post(
+            reverse('login'),
+            {
+                'username': 'testuser',
+                'password': 'pass@123'
+            }, format='json'
+        ).data['micro-auth-token']
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        res = self.client.post(reverse('logout'))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['message'], 'Logged out successfully.')
+
+    def test_logout_unauthenticated(self):
+        """ test: trying to log out without logging in """
+        response = self.client.post(reverse('logout'), format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn('detail', response.data)
+
+    
