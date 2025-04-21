@@ -115,3 +115,23 @@ class LoginSerializerTests(BaseAuthTestCase):
 
         self.assertFalse(serializer.is_valid())
         self.assertIn('non_field_errors', serializer.errors)
+
+    def test_login_unverified_user(self):
+        """ test to check logging in with unverified email """
+
+        user = UserModel.objects.create_user(
+            {
+                'username': 'userx',
+                'email': 'test@email.com',
+                'password': 'pass@123'
+            }
+        )
+        serializer = LoginSerializer(
+            data={
+                'username': 'userx',
+                'password': 'pass@123'
+            },
+            context={'request': self.context}
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('non_field_errors', serializer.errors)
