@@ -6,6 +6,7 @@ from django.conf import settings
 from django.db import IntegrityError
 from rest_framework import serializers
 from django.core.mail import send_mail
+from django.contrib.auth import authenticate
 from django.utils.encoding import force_bytes
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured
@@ -180,6 +181,22 @@ class LoginSerializer(serializers.ModelSerializer):
         """
 
         username_field = getattr(UserModel, 'USERNAME_FIELD', 'username')
+
+        auth_kwargs = {
+            username_field: data[username_field],
+            'password': data['password']
+        }
+        user = authenticate(
+            request=self.context.get('request'), **auth_kwargs
+        )
+        if not user:
+            raise serializers.ValidationError(
+                {'non_field_errors': f'Invalid {username_field} or password.'}
+            )
+        if not user.is_active:
+            raise serializers.ValidationError(
+                {'non_field_errors': 'Email address is not verified.'}
+            )
 
         return {
             username_field: data[username_field],

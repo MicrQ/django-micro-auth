@@ -5,7 +5,7 @@ from rest_framework.test import APIClient
 from django_micro_auth import MICRO_AUTH_MODE
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
-from django_micro_auth.serializers import RegisterSerializer
+from django_micro_auth.serializers import LoginSerializer, RegisterSerializer
 
 
 UserModel = get_user_model()
@@ -84,3 +84,34 @@ class RegisterSerializerTests(BaseAuthTestCase):
 
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].subject, 'Verify Your Email Address')
+
+
+class LoginSerializerTests(BaseAuthTestCase):
+    """ Login functionality tests """
+
+    def setUp(self):
+        super().setUp()
+        self.user = self.create_user(is_active=True) # Verified user for test
+        self.context = {'request': self.factory.post('auth/login/')}
+
+    def test_login_valid_credentials(self):
+        """ test to check valid user login attempt """
+
+        serializer = LoginSerializer(data={
+            'username': 'testuser',
+            'password': 'pass@123'
+        }, context=self.context)
+
+        self.assertTrue(serializer.is_valid())
+        self.assertEqual(
+            serializer.validated_data['username'], 'testuser'
+        )
+
+    def test_login_invalid_credentials(self):
+        serializer = LoginSerializer(data={
+            'username': 'testuser',
+            'password': 'wrooooong'
+        }, context=self.context)
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('non_field_errors', serializer.errors)
