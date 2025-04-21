@@ -7,7 +7,11 @@ from django_micro_auth import MICRO_AUTH_MODE
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
 from rest_framework.test import APITestCase, APIClient
-from django_micro_auth.serializers import LoginSerializer, RegisterSerializer
+from django_micro_auth.serializers import (
+    LoginSerializer,
+    RegisterSerializer,
+    PasswordChangeSerializer,
+)
 
 
 UserModel = get_user_model()
@@ -138,6 +142,38 @@ class LoginSerializerTests(BaseAuthTestCase):
         )
         self.assertFalse(serializer.is_valid())
         self.assertIn('non_field_errors', serializer.errors)
+
+
+class PasswordChangeSerializerTests(BaseAuthTestCase):
+    """ tests for password changing functionality """
+
+    def setUp(self):
+        super().setUp()
+        self.user = self.create_user(is_active=True)
+
+    def test_password_change_valid(self):
+        """ test changing password """
+        serializer = PasswordChangeSerializer(
+            data={
+                'old_password': 'pass@123',
+                'new_password': 'new@123'
+            }, context={'request': type('Request', (), {'user': self.user})}
+        )
+        self.assertTrue(serializer.is_valid())
+        self.assertEqual(
+            serializer.validated_data['new_password'], 'new@123'
+        )
+
+    def test_password_change_invalid(self):
+        """ test changing password with invalid old password """
+        serializer = PasswordChangeSerializer(
+            data={
+                'old_password': 'wongpass',
+                'new_password': 'new@123'
+            }, context={'request': type('Request', (), {'user': self.user})}
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('old_password', serializer.errors)
 
 
 class MicroAuthIntegrationTests(APITestCase):
