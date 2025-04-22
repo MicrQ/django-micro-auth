@@ -452,3 +452,15 @@ class MicroAuthIntegrationTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['message'], 'Verification email resent.')
         self.assertEqual(len(mail.outbox), 1)
+
+    def test_resend_verify_email_already_verified(self):
+        self.user.is_active = True
+        self.user.save()
+        response = self.client.post(
+            reverse('resend_verify_email'),
+            {'email': 'test@user.com'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['message'], 'Email is already verified.')
+        self.assertEqual(len(mail.outbox), 0)
