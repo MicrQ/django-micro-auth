@@ -415,12 +415,30 @@ class MicroAuthIntegrationTests(APITestCase):
         uidb64 = urlsafe_base64_encode(force_bytes(self.user.pk))
         token = PasswordResetTokenGenerator().make_token(self.user)
         response = self.client.post(
-            reverse('password_reset') + f'confirm/{uidb64}/{token}/', {
-            'new_password': 'new@123'
-        }, format='json')
+            reverse(
+                'password_reset_confirm',
+                kwargs={'uidb64': uidb64, 'token': token}
+            ),
+            {'new_password': 'new@123'},
+            format='json',
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['message'], 'Password reset successfully.')
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password('new@123'))
 
-    
+    def test_verify_email_success(self):
+        """ test: verifiying user email """
+        uidb64 = urlsafe_base64_encode(force_bytes(self.user.pk))
+        token = PasswordResetTokenGenerator().make_token(self.user)
+        response = self.client.post(
+            reverse(
+                'verify-email',
+                kwargs={'uidb64': uidb64, 'token': token}
+            ),
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['message'], 'Email verified successfully.')
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.is_active)

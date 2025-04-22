@@ -460,7 +460,7 @@ class VerifyEmailAPIView(APIView):
             user.save()
 
             return Response(
-                {'message': 'Email verifed successfully'},
+                {'message': 'Email verified successfully.'},
                 status=status.HTTP_200_OK
             )
 
