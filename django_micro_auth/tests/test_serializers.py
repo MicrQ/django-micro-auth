@@ -285,7 +285,7 @@ class MicroAuthIntegrationTests(APITestCase):
     def setUp(self):
         self.user_data = {
             'username': 'testuser',
-            'email': 'user@email.com',
+            'email': 'test@user.com',
             'password': 'pass@123'
         }
         self.client = APIClient()
@@ -362,4 +362,48 @@ class MicroAuthIntegrationTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertIn('detail', response.data)
 
-    
+    def test_password_change_success(self):
+        """ test to check password changing endpoint """
+        self.user.is_active = True
+        self.user.save()
+        token = self.client.post(
+            reverse('login'),
+            {
+                'username': 'testuser',
+                'password': 'pass@123'
+            }, format='json'
+        ).data['micro-auth-token']
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        response = self.client.post(reverse('password_change'), {
+            'old_password': 'pass@123',
+            'new_password': 'new@123'
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['message'], 'Password changed successfully.')
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('new@123'))
+
+    def test_password_reset_success(self):
+        """ test user password resetting """
+        self.user.is_active = True
+        self.user.save()
+        response = self.client.post(
+            reverse('password_reset'),
+            {'email': 'test@user.com'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['message'], 'Password reset email sent.')
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('Password Reset Request', mail.outbox[0].subject)
+
+    def test_password_reset_unverified(self):
+        response = self.client.post(
+            reverse('password_reset'),
+            {'email': 'test@user.com'},
+            format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('email', response.data)
+        self.assertEqual(response.data['email'][0], 'Email address is not verified.')
+
