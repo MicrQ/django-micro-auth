@@ -228,14 +228,17 @@ class PasswordResetSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
     def validate_email(self, value):
+        request = self.context.get('request')
+        allowed_urls = {reverse('resend_verify_email')}
         user = UserModel.objects.filter(email=value).first()
 
         if not user:
             raise serializers.ValidationError(
                 'No user found with this email address.'
             )
-        
-        if not user.is_active:
+
+        if not user.is_active and (
+            not request or request.path not in allowed_urls):
             raise serializers.ValidationError('Email address is not verified.')
         
         return value

@@ -503,7 +503,10 @@ class ResendVerifyEmailAPIView(APIView):
         description="Resend a verification email for an unverified user account."
     )
     def post(self, request):
-        serializer = PasswordResetSerializer(data=request.data)
+        serializer = PasswordResetSerializer(
+            data=request.data,
+            context={'request': request}
+        )
         if serializer.is_valid():
             user = get_user_model().objects.filter(
                 email=serializer.validated_data['email']
@@ -539,5 +542,5 @@ class ResendVerifyEmailAPIView(APIView):
 
         return Response(
             serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST
+            status=status.HTTP_401_UNAUTHORIZED
         )
