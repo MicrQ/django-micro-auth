@@ -399,6 +399,7 @@ class MicroAuthIntegrationTests(APITestCase):
         self.assertIn('Password Reset Request', mail.outbox[0].subject)
 
     def test_password_reset_unverified(self):
+        """ test: trying to reset password of unverified account """
         response = self.client.post(
             reverse('password_reset'),
             {'email': 'test@user.com'},
@@ -407,3 +408,19 @@ class MicroAuthIntegrationTests(APITestCase):
         self.assertIn('email', response.data)
         self.assertEqual(response.data['email'][0], 'Email address is not verified.')
 
+    def test_password_reset_confirm_success(self):
+        """ test: confirm password reset using link """
+        self.user.is_active = True
+        self.user.save()
+        uidb64 = urlsafe_base64_encode(force_bytes(self.user.pk))
+        token = PasswordResetTokenGenerator().make_token(self.user)
+        response = self.client.post(
+            reverse('password_reset') + f'confirm/{uidb64}/{token}/', {
+            'new_password': 'new@123'
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['message'], 'Password reset successfully.')
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('new@123'))
+
+    
