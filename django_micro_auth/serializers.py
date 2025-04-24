@@ -181,21 +181,18 @@ class LoginSerializer(serializers.ModelSerializer):
         """
 
         username_field = getattr(UserModel, 'USERNAME_FIELD', 'username')
+        username_field = getattr(UserModel, 'USERNAME_FIELD', 'username')
+        user = UserModel.objects.filter(**{username_field: data.get(username_field)}).first()
 
-        auth_kwargs = {
-            username_field: data[username_field],
-            'password': data['password']
-        }
-        user = authenticate(
-            request=self.context.get('request'), **auth_kwargs
-        )
-        if not user:
-            raise serializers.ValidationError(
-                {'non_field_errors': f'Invalid {username_field} or password.'}
-            )
-        if not user.is_active:
+        if user and not user.is_active:
             raise serializers.ValidationError(
                 {'non_field_errors': 'Email address is not verified.'}
+            )
+        
+        # check password
+        if not user.check_password(data.get('password')):
+            raise serializers.ValidationError(
+                {'non_field_errors': f'Invalid {username_field} or password.'}
             )
 
         return user
